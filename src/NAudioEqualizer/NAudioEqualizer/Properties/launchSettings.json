@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "NAudioEqualizer (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "NAudioEqualizer (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
