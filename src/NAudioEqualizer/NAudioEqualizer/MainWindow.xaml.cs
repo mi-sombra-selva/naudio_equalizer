@@ -1,11 +1,10 @@
 using Microsoft.UI.Xaml;
-using NAudio.Wave;
-using Windows.Storage.Pickers;
+using Microsoft.UI.Xaml.Input;
+using NAudioEqualizer.Services;
+using NAudioEqualizer.Services.Interfaces;
+using NAudioEqualizer.ViewModels;
 using Windows.Storage;
 using System;
-
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
 
 namespace NAudioEqualizer
 {
@@ -14,71 +13,24 @@ namespace NAudioEqualizer
     /// </summary>
     public sealed partial class MainWindow : Window
     {
-        private WaveOutEvent outputDevice;
-        private AudioFileReader audioFile;
-        private string selectedFilePath;
-        private bool isPaused;
+        public MainWindowViewModel ViewModel { get; }
 
         public MainWindow()
         {
+            // Create services
+            IEqualizerService equalizerService = new EqualizerService();
+            IAudioService audioService = new AudioService(equalizerService);
+
+            // Create and initialize ViewModel
+            ViewModel = new MainWindowViewModel(audioService, equalizerService);
             this.InitializeComponent();
+            ViewModel.Initialize(this);
+            this.Closed += MainWindow_Closed;
         }
 
-        private async void SelectFile_Click(object sender, RoutedEventArgs e)
+        private void MainWindow_Closed(object sender, WindowEventArgs args)
         {
-            var picker = new FileOpenPicker();
-            picker.FileTypeFilter.Add(".mp3");
-            picker.FileTypeFilter.Add(".wav");
-
-            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-            StorageFile file = await picker.PickSingleFileAsync();
-            if (file != null)
-            {
-                selectedFilePath = file.Path;
-                FilePathText.Text = selectedFilePath;
-            }
-        }
-
-        private void PlayButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (string.IsNullOrEmpty(selectedFilePath)) return;
-
-            if (outputDevice == null)
-            {
-                outputDevice = new WaveOutEvent();
-                audioFile = new AudioFileReader(selectedFilePath);
-                outputDevice.Init(audioFile);
-            }
-
-            if (isPaused)
-            {
-                outputDevice.Play();
-                isPaused = false;
-            }
-            else
-            {
-                outputDevice.Play();
-            }
-        }
-
-        private void PauseButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (outputDevice?.PlaybackState == PlaybackState.Playing)
-            {
-                outputDevice?.Pause();
-                isPaused = true;
-            }
-        }
-
-        private void StopButton_Click(object sender, RoutedEventArgs e)
-        {
-            outputDevice?.Stop();
-            outputDevice?.Dispose();
-            audioFile?.Dispose();
-            outputDevice = null;
-            audioFile = null;
+            ViewModel.Dispose();
         }
 
         private void Window_DragOver(object sender, DragEventArgs e)
@@ -96,11 +48,30 @@ namespace NAudioEqualizer
                     var file = items[0] as StorageFile;
                     if (file != null)
                     {
-                        selectedFilePath = file.Path;
-                        FilePathText.Text = selectedFilePath;
+                        ViewModel.HandleDrop(file);
                     }
                 }
             }
+        }
+
+        private void ProgressSlider_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            ViewModel.SetProgressDragging(true);
+        }
+
+        private void ProgressSlider_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            ViewModel.SetProgressDragging(false);
+        }
+
+        private void ProgressSlider_PointerCanceled(object sender, PointerRoutedEventArgs e)
+        {
+            ViewModel.SetProgressDragging(false);
+        }
+
+        private void ProgressSlider_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
+        {
+            ViewModel.SetProgressDragging(false);
         }
     }
 }
